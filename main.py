@@ -121,6 +121,7 @@ file_menu.add_command(label="New Game", command=lambda: reset_game(True))
 file_menu.add_command(label="Save Game", command=save_game)
 file_menu.add_command(label="Load Game", command=load_game)
 file_menu.add_command(label="High Scores", command=display_high_scores)
+file_menu.add_command(label="Set Custom Words", command=set_custom_words)
 file_menu.add_command(label="Exit", command=root.quit)
 
 help_menu = tk.Menu(menu, tearoff=0)
@@ -149,6 +150,14 @@ def set_difficulty():
     remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses}")
     reset_game(False)
 
+def set_custom_words():
+    global categories
+    new_words = simpledialog.askstring("Custom Words", "Enter custom words separated by commas:")
+    if new_words:
+        custom_words = [word.strip().upper() for word in new_words.split(",")]
+        categories["Custom Words"] = custom_words
+    reset_game(False)
+
 guessed_letters = []
 incorrect_guesses = 0
 correct_guesses = 0
@@ -169,8 +178,7 @@ def update_word_display():
     if "_" not in display_text:
         elapsed_time = int(time.time() - game_start_time)
         save_high_score(elapsed_time)
-        messagebox.showinfo("Congratulations", f"You won in {elapsed_time} seconds!")
-        reset_game(False)
+        show_game_over_stats(True)
 
 def update_hangman_display():
     hangman_canvas.delete("all")
@@ -206,16 +214,15 @@ def submit_letter():
     elif letter in word:
         guessed_letters.append(letter)
         correct_guesses += 1
-        update_word_display()
         correct_label.config(text=f"Correct Guesses: {correct_guesses}")
+        update_word_display()
     else:
-        incorrect_guesses += 1
         guessed_letters.append(letter)
+        incorrect_guesses += 1
         remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses - incorrect_guesses}")
         update_hangman_display()
         if incorrect_guesses >= max_incorrect_guesses:
-            messagebox.showinfo("Game Over", f"You lost! The word was {word}.")
-            reset_game(False)
+            show_game_over_stats(False)
     letter_entry.delete(0, tk.END)
     guessed_label.config(text="Guessed Letters: " + ", ".join(guessed_letters))
 
@@ -320,6 +327,15 @@ def use_hint():
         update_word_display()
     else:
         messagebox.showwarning("No Hints Left", "You have used all your hints.")
+
+def show_game_over_stats(won):
+    if won:
+        elapsed_time = int(time.time() - game_start_time)
+        messagebox.showinfo("You Won!", f"Congratulations! You guessed the word {word} correctly in {elapsed_time} seconds with {correct_guesses} correct guesses and {incorrect_guesses} incorrect guesses.")
+        save_high_score(elapsed_time)
+    else:
+        messagebox.showinfo("Game Over", f"You lost! The word was {word}.")
+    reset_game(False)
 
 update_time()
 root.mainloop()
