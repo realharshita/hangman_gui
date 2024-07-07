@@ -50,11 +50,27 @@ frame.pack(expand=True, fill=tk.BOTH)
 title_label = tk.Label(frame, text="Hangman Game", font=("Helvetica", 24))
 title_label.pack(pady=10)
 
-words = ["PYTHON", "DEVELOPER", "HANGMAN", "COMPUTER", "PROGRAMMING"]
-word = random.choice(words)
+categories = {
+    "Programming Languages": ["PYTHON", "JAVA", "RUBY", "PHP", "JAVASCRIPT"],
+    "Animals": ["ELEPHANT", "TIGER", "ZEBRA", "PENGUIN", "GIRAFFE"],
+    "Countries": ["INDIA", "CANADA", "BRAZIL", "JAPAN", "RUSSIA"],
+}
+current_category = ""
+words = []
+
+def choose_word():
+    global words, current_category
+    current_category = random.choice(list(categories.keys()))
+    words = categories[current_category]
+    return random.choice(words)
+
+word = choose_word()
 blanks = ["_"] * len(word)
 word_label = tk.Label(frame, text=" ".join(blanks), font=("Helvetica", 18))
 word_label.pack(pady=20)
+
+category_label = tk.Label(frame, text=f"Category: {current_category}", font=("Helvetica", 14))
+category_label.pack()
 
 hangman_canvas = tk.Canvas(frame, width=200, height=200, bg=current_theme["canvas_bg"])
 hangman_canvas.pack(pady=20)
@@ -186,24 +202,25 @@ def reset_game(new_game):
     incorrect_guesses = 0
     correct_guesses = 0
     if new_game:
-        word = random.choice(words)
+        word = choose_word()
     game_start_time = time.time()
     start_time = 0
     update_word_display()
     update_hangman_display()
     remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses}")
     guessed_label.config(text="Guessed Letters: ")
-    correct_label.config(text=f"Correct Guesses: {correct_guesses}")
+    correct_label.config(text="Correct Guesses: 0")
+    time_label.config(text="Time Elapsed: 0s")
 
 def save_game():
-    global start_time
+    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time
     game_state = {
         "word": word,
         "guessed_letters": guessed_letters,
         "incorrect_guesses": incorrect_guesses,
         "correct_guesses": correct_guesses,
         "game_start_time": game_start_time,
-        "start_time": start_time
+        "start_time": start_time,
     }
     with open("hangman_save.json", "w") as f:
         json.dump(game_state, f)
@@ -235,7 +252,7 @@ def show_instructions():
     instructions = """
     Hangman Game Instructions:
 
-    1. A random word is chosen, and you must guess the letters in the word.
+    1. A random word from a selected category is chosen, and you must guess the letters in the word.
     2. Enter a letter and click 'Submit' to guess.
     3. You have 6 incorrect guesses allowed before the hangman is fully drawn.
     4. The game ends when you correctly guess the word or run out of guesses.
@@ -263,4 +280,3 @@ def display_high_scores():
 
 update_time()
 root.mainloop()
-sss
