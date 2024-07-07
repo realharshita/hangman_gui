@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import messagebox
 import random
 import time
+import json
+import os
 
 root = tk.Tk()
 root.title("Hangman Game")
@@ -54,6 +56,15 @@ time_label.pack(pady=10)
 new_game_button = tk.Button(frame, text="New Game", font=("Helvetica", 14))
 new_game_button.pack(pady=10)
 
+menu = tk.Menu(root)
+root.config(menu=menu)
+file_menu = tk.Menu(menu, tearoff=0)
+menu.add_cascade(label="File", menu=file_menu)
+file_menu.add_command(label="New Game", command=lambda: reset_game(True))
+file_menu.add_command(label="Save Game", command=save_game)
+file_menu.add_command(label="Load Game", command=load_game)
+file_menu.add_command(label="Exit", command=root.quit)
+
 guessed_letters = []
 incorrect_guesses = 0
 correct_guesses = 0
@@ -70,7 +81,7 @@ def update_word_display():
     word_label.config(text=display_text)
     if "_" not in display_text:
         messagebox.showinfo("Congratulations", "You won!")
-        reset_game()
+        reset_game(False)
 
 def update_hangman_display():
     hangman_canvas.delete("all")
@@ -115,16 +126,17 @@ def submit_letter():
         remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses - incorrect_guesses}")
         if incorrect_guesses >= max_incorrect_guesses:
             messagebox.showinfo("Game Over", f"You lost! The word was: {word}")
-            reset_game()
+            reset_game(False)
     letter_entry.delete(0, tk.END)
     guessed_label.config(text="Guessed Letters: " + ", ".join(guessed_letters))
 
-def reset_game():
+def reset_game(new_game):
     global guessed_letters, incorrect_guesses, correct_guesses, word, start_time
     guessed_letters = []
     incorrect_guesses = 0
     correct_guesses = 0
-    word = random.choice(words)
+    if new_game:
+        word = random.choice(words)
     start_time = time.time()
     update_word_display()
     update_hangman_display()
@@ -132,8 +144,39 @@ def reset_game():
     guessed_label.config(text="Guessed Letters: ")
     correct_label.config(text=f"Correct Guesses: {correct_guesses}")
 
+def save_game():
+    game_state = {
+        "word": word,
+        "guessed_letters": guessed_letters,
+        "incorrect_guesses": incorrect_guesses,
+        "correct_guesses": correct_guesses,
+        "start_time": start_time
+    }
+    with open("hangman_save.json", "w") as f:
+        json.dump(game_state, f)
+    messagebox.showinfo("Game Saved", "Your game has been saved.")
+
+def load_game():
+    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time
+    if os.path.exists("hangman_save.json"):
+        with open("hangman_save.json", "r") as f:
+            game_state = json.load(f)
+            word = game_state["word"]
+            guessed_letters = game_state["guessed_letters"]
+            incorrect_guesses = game_state["incorrect_guesses"]
+            correct_guesses = game_state["correct_guesses"]
+            start_time = game_state["start_time"]
+        update_word_display()
+        update_hangman_display()
+        remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses - incorrect_guesses}")
+        guessed_label.config(text="Guessed Letters: " + ", ".join(guessed_letters))
+        correct_label.config(text=f"Correct Guesses: {correct_guesses}")
+        messagebox.showinfo("Game Loaded", "Your game has been loaded.")
+    else:
+        messagebox.showwarning("Load Game", "No saved game found.")
+
 submit_button.config(command=submit_letter)
-new_game_button.config(command=reset_game)
+new_game_button.config(command=lambda: reset_game(True))
 
 update_time()
 root.mainloop()
