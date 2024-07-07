@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 import random
 import time
 import json
@@ -63,24 +63,31 @@ menu.add_cascade(label="File", menu=file_menu)
 file_menu.add_command(label="New Game", command=lambda: reset_game(True))
 file_menu.add_command(label="Save Game", command=save_game)
 file_menu.add_command(label="Load Game", command=load_game)
+file_menu.add_command(label="High Scores", command=display_high_scores)
 file_menu.add_command(label="Exit", command=root.quit)
 
 guessed_letters = []
 incorrect_guesses = 0
 correct_guesses = 0
 max_incorrect_guesses = 6
-start_time = time.time()
+start_time = 0
+game_start_time = 0
+high_scores = []
 
 def update_time():
-    elapsed_time = int(time.time() - start_time)
-    time_label.config(text=f"Time Elapsed: {elapsed_time}s")
+    global start_time
+    if start_time:
+        elapsed_time = int(time.time() - start_time)
+        time_label.config(text=f"Time Elapsed: {elapsed_time}s")
     root.after(1000, update_time)
 
 def update_word_display():
     display_text = " ".join([letter if letter in guessed_letters else "_" for letter in word])
     word_label.config(text=display_text)
     if "_" not in display_text:
-        messagebox.showinfo("Congratulations", "You won!")
+        elapsed_time = int(time.time() - game_start_time)
+        save_high_score(elapsed_time)
+        messagebox.showinfo("Congratulations", f"You won in {elapsed_time} seconds!")
         reset_game(False)
 
 def update_hangman_display():
@@ -131,13 +138,14 @@ def submit_letter():
     guessed_label.config(text="Guessed Letters: " + ", ".join(guessed_letters))
 
 def reset_game(new_game):
-    global guessed_letters, incorrect_guesses, correct_guesses, word, start_time
+    global guessed_letters, incorrect_guesses, correct_guesses, word, start_time, game_start_time
     guessed_letters = []
     incorrect_guesses = 0
     correct_guesses = 0
     if new_game:
         word = random.choice(words)
-    start_time = time.time()
+    game_start_time = time.time()
+    start_time = 0
     update_word_display()
     update_hangman_display()
     remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses}")
@@ -145,11 +153,13 @@ def reset_game(new_game):
     correct_label.config(text=f"Correct Guesses: {correct_guesses}")
 
 def save_game():
+    global start_time
     game_state = {
         "word": word,
         "guessed_letters": guessed_letters,
         "incorrect_guesses": incorrect_guesses,
         "correct_guesses": correct_guesses,
+        "game_start_time": game_start_time,
         "start_time": start_time
     }
     with open("hangman_save.json", "w") as f:
@@ -157,7 +167,7 @@ def save_game():
     messagebox.showinfo("Game Saved", "Your game has been saved.")
 
 def load_game():
-    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time
+    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time
     if os.path.exists("hangman_save.json"):
         with open("hangman_save.json", "r") as f:
             game_state = json.load(f)
@@ -165,6 +175,7 @@ def load_game():
             guessed_letters = game_state["guessed_letters"]
             incorrect_guesses = game_state["incorrect_guesses"]
             correct_guesses = game_state["correct_guesses"]
+            game_start_time = game_state["game_start_time"]
             start_time = game_state["start_time"]
         update_word_display()
         update_hangman_display()
@@ -174,6 +185,28 @@ def load_game():
         messagebox.showinfo("Game Loaded", "Your game has been loaded.")
     else:
         messagebox.showwarning("Load Game", "No saved game found.")
+
+def save_high_score(elapsed_time):
+    global high_scores
+    name = simpledialog.askstring("High Score", "Congratulations! You achieved a high score.\nEnter your name:")
+    if not name:
+        name = "Anonymous"
+    high_scores.append({"name": name, "time": elapsed_time})
+    high_scores.sort(key=lambda x: x["time"])
+    if len(high_scores) > 5:
+        high_scores = high_scores[:5]
+    with open("high_scores.json", "w") as f:
+        json.dump(high_scores, f)
+
+def display_high_scores():
+    global high_scores
+    if os.path.exists("high_scores.json"):
+        with open("high_scores.json", "r") as f:
+            high_scores = json.load(f)
+        high_score_text = "\n".join([f"{score['name']}: {score['time']}s" for score in high_scores])
+        messagebox.showinfo("High Scores", f"Top High Scores:\n{high_score_text}")
+    else:
+        messagebox.showinfo("High Scores", "No high scores yet.")
 
 submit_button.config(command=submit_letter)
 new_game_button.config(command=lambda: reset_game(True))
