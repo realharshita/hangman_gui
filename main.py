@@ -9,7 +9,6 @@ root = tk.Tk()
 root.title("Hangman Game")
 root.geometry("800x600")
 
-# Theme colors
 light_theme = {
     "bg": "white",
     "fg": "black",
@@ -26,7 +25,7 @@ dark_theme = {
     "button_fg": "white",
 }
 
-current_theme = light_theme  # Default to light theme
+current_theme = light_theme
 
 def toggle_theme():
     global current_theme
@@ -43,6 +42,7 @@ def apply_theme():
     hangman_canvas.configure(bg=current_theme["canvas_bg"])
     submit_button.configure(bg=current_theme["button_bg"], fg=current_theme["button_fg"])
     new_game_button.configure(bg=current_theme["button_bg"], fg=current_theme["button_fg"])
+    hint_button.configure(bg=current_theme["button_bg"], fg=current_theme["button_fg"])
 
 frame = tk.Frame(root, padx=20, pady=20)
 frame.pack(expand=True, fill=tk.BOTH)
@@ -92,6 +92,9 @@ letter_entry.grid(row=0, column=1)
 submit_button = tk.Button(input_frame, text="Submit", font=("Helvetica", 14), bg=current_theme["button_bg"], fg=current_theme["button_fg"])
 submit_button.grid(row=0, column=2, padx=10)
 
+hint_button = tk.Button(input_frame, text="Hint", font=("Helvetica", 14), bg=current_theme["button_bg"], fg=current_theme["button_fg"], command=use_hint)
+hint_button.grid(row=0, column=3, padx=10)
+
 guessed_label = tk.Label(frame, text="Guessed Letters: ", font=("Helvetica", 14))
 guessed_label.pack(pady=10)
 
@@ -101,10 +104,13 @@ remaining_label.pack(pady=10)
 correct_label = tk.Label(frame, text="Correct Guesses: 0", font=("Helvetica", 14))
 correct_label.pack(pady=10)
 
+hint_label = tk.Label(frame, text="Hints Remaining: 3", font=("Helvetica", 14))
+hint_label.pack(pady=10)
+
 time_label = tk.Label(frame, text="Time Elapsed: 0s", font=("Helvetica", 14))
 time_label.pack(pady=10)
 
-new_game_button = tk.Button(frame, text="New Game", font=("Helvetica", 14), bg=current_theme["button_bg"], fg=current_theme["button_fg"])
+new_game_button = tk.Button(frame, text="New Game", font=("Helvetica", 14), bg=current_theme["button_bg"], fg=current_theme["button_fg"], command=lambda: reset_game(True))
 new_game_button.pack(pady=10)
 
 menu = tk.Menu(root)
@@ -125,10 +131,27 @@ theme_menu = tk.Menu(menu, tearoff=0)
 menu.add_cascade(label="Theme", menu=theme_menu)
 theme_menu.add_command(label="Toggle Theme", command=toggle_theme)
 
+difficulty_levels = {
+    "Easy": 8,
+    "Medium": 6,
+    "Hard": 4,
+}
+current_difficulty = "Medium"
+max_incorrect_guesses = difficulty_levels[current_difficulty]
+hints_remaining = 3
+
+def set_difficulty():
+    global current_difficulty, max_incorrect_guesses
+    current_difficulty = simpledialog.askstring("Set Difficulty", "Choose difficulty (Easy, Medium, Hard):")
+    if current_difficulty not in difficulty_levels:
+        current_difficulty = "Medium"
+    max_incorrect_guesses = difficulty_levels[current_difficulty]
+    remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses}")
+    reset_game(False)
+
 guessed_letters = []
 incorrect_guesses = 0
 correct_guesses = 0
-max_incorrect_guesses = 6
 start_time = 0
 game_start_time = 0
 high_scores = []
@@ -188,32 +211,37 @@ def submit_letter():
     else:
         incorrect_guesses += 1
         guessed_letters.append(letter)
-        update_hangman_display()
         remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses - incorrect_guesses}")
+        update_hangman_display()
         if incorrect_guesses >= max_incorrect_guesses:
-            messagebox.showinfo("Game Over", f"You lost! The word was: {word}")
+            messagebox.showinfo("Game Over", f"You lost! The word was {word}.")
             reset_game(False)
     letter_entry.delete(0, tk.END)
     guessed_label.config(text="Guessed Letters: " + ", ".join(guessed_letters))
 
+submit_button.config(command=submit_letter)
+
 def reset_game(new_game):
-    global guessed_letters, incorrect_guesses, correct_guesses, word, start_time, game_start_time
+    global word, blanks, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time, hints_remaining
+    if new_game:
+        set_difficulty()
+    word = choose_word()
+    blanks = ["_"] * len(word)
+    word_label.config(text=" ".join(blanks))
     guessed_letters = []
     incorrect_guesses = 0
     correct_guesses = 0
-    if new_game:
-        word = choose_word()
+    start_time = time.time()
     game_start_time = time.time()
-    start_time = 0
-    update_word_display()
-    update_hangman_display()
+    hints_remaining = 3
     remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses}")
     guessed_label.config(text="Guessed Letters: ")
-    correct_label.config(text="Correct Guesses: 0")
+    correct_label.config(text=f"Correct Guesses: {correct_guesses}")
     time_label.config(text="Time Elapsed: 0s")
+    hint_label.config(text=f"Hints Remaining: {hints_remaining}")
+    update_hangman_display()
 
 def save_game():
-    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time
     game_state = {
         "word": word,
         "guessed_letters": guessed_letters,
@@ -221,13 +249,14 @@ def save_game():
         "correct_guesses": correct_guesses,
         "game_start_time": game_start_time,
         "start_time": start_time,
+        "hints_remaining": hints_remaining,
     }
     with open("hangman_save.json", "w") as f:
         json.dump(game_state, f)
     messagebox.showinfo("Game Saved", "Game saved successfully.")
 
 def load_game():
-    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time
+    global word, guessed_letters, incorrect_guesses, correct_guesses, start_time, game_start_time, hints_remaining
     if os.path.exists("hangman_save.json"):
         with open("hangman_save.json", "r") as f:
             game_state = json.load(f)
@@ -237,6 +266,7 @@ def load_game():
         correct_guesses = game_state["correct_guesses"]
         game_start_time = game_state["game_start_time"]
         start_time = game_state["start_time"]
+        hints_remaining = game_state["hints_remaining"]
         update_word_display()
         update_hangman_display()
         remaining_label.config(text=f"Remaining Guesses: {max_incorrect_guesses - incorrect_guesses}")
@@ -244,6 +274,7 @@ def load_game():
         correct_label.config(text=f"Correct Guesses: {correct_guesses}")
         elapsed_time = int(time.time() - game_start_time)
         time_label.config(text=f"Time Elapsed: {elapsed_time}s")
+        hint_label.config(text=f"Hints Remaining: {hints_remaining}")
         messagebox.showinfo("Game Loaded", "Game loaded successfully.")
     else:
         messagebox.showinfo("No Saved Game", "No saved game found.")
@@ -254,8 +285,9 @@ def show_instructions():
 
     1. A random word from a selected category is chosen, and you must guess the letters in the word.
     2. Enter a letter and click 'Submit' to guess.
-    3. You have 6 incorrect guesses allowed before the hangman is fully drawn.
+    3. You have a limited number of incorrect guesses allowed before the hangman is fully drawn.
     4. The game ends when you correctly guess the word or run out of guesses.
+    5. Use hints wisely, as you have limited hints available.
     """
     messagebox.showinfo("How to Play", instructions)
 
@@ -277,6 +309,17 @@ def display_high_scores():
         messagebox.showinfo("High Scores", f"Top High Scores:\n{high_score_text}")
     else:
         messagebox.showinfo("High Scores", "No high scores yet.")
+
+def use_hint():
+    global hints_remaining
+    if hints_remaining > 0:
+        hint_letter = random.choice([letter for letter in word if letter not in guessed_letters])
+        guessed_letters.append(hint_letter)
+        hints_remaining -= 1
+        hint_label.config(text=f"Hints Remaining: {hints_remaining}")
+        update_word_display()
+    else:
+        messagebox.showwarning("No Hints Left", "You have used all your hints.")
 
 update_time()
 root.mainloop()
